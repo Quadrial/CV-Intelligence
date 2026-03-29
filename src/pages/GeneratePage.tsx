@@ -164,7 +164,7 @@ export default function GeneratePage() {
                 'Make sure your profile has detailed work experience with STAR-method descriptions.',
                 'The AI will reorder and emphasize the most relevant parts of your CV.',
                 'Review the preview before downloading — you can regenerate if needed.',
-                'Add your Gemini API key to .env as VITE_GEMINI_API_KEY.',
+                
               ].map((tip, i) => (
                 <li key={i} className="flex gap-2">
                   <span className="text-indigo-400 font-bold shrink-0">{i + 1}.</span>

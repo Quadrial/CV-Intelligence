@@ -58,14 +58,8 @@ export default function LoginPage() {
       <div className="w-full max-w-md">
         {/* Logo / Brand */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-indigo-600 mb-4">
-            <svg className="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-            </svg>
-          </div>
-          <h1 className="text-2xl font-bold text-white">CV Generator</h1>
-          <p className="text-slate-400 text-sm mt-1">Tailor your CV to every job in seconds</p>
+          <img src="/logo1.png" alt="CV Generator" className="w-48 h-48 object-contain mx-auto" />
+          <p className="text-slate-400 text-sm -mt-14">Tailor your CV to every job in seconds</p>
         </div>
 
         {/* Card */}
