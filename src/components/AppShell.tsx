@@ -1,62 +1,99 @@
+import { useState } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 
+const navLinks = [
+  { to: '/profile', label: 'Profile' },
+  { to: '/generate', label: 'Generate CV' },
+  { to: '/history', label: 'History' },
+];
+
 export default function AppShell() {
   const navigate = useNavigate();
+  const [menuOpen, setMenuOpen] = useState(false);
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
     navigate('/login');
   };
 
+  const linkCls = ({ isActive }: { isActive: boolean }) =>
+    `text-sm font-medium transition-colors ${isActive ? 'text-indigo-400' : 'text-slate-400 hover:text-white'}`;
+
   return (
     <div className="min-h-screen bg-slate-900 text-white">
-      <nav className="bg-slate-800 border-b border-slate-700 px-6 py-4 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center">
-            <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-            </svg>
+      {/* ── Nav ── */}
+      <nav className="bg-slate-800 border-b border-slate-700 px-4 sm:px-6">
+        <div className="flex items-center justify-between h-14">
+          {/* Logo */}
+          <div className="flex items-center gap-2 shrink-0">
+            <div className="w-8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center">
+              <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                  d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+            </div>
+            <span className="font-bold text-white text-sm">CV Generator</span>
           </div>
-          <span className="font-bold text-white">CV Generator</span>
-        </div>
 
-        <div className="flex items-center gap-6">
-          <NavLink
-            to="/profile"
-            className={({ isActive }) =>
-              `text-sm font-medium transition-colors ${isActive ? 'text-indigo-400' : 'text-slate-400 hover:text-white'}`
-            }
-          >
-            Profile
-          </NavLink>
-          <NavLink
-            to="/generate"
-            className={({ isActive }) =>
-              `text-sm font-medium transition-colors ${isActive ? 'text-indigo-400' : 'text-slate-400 hover:text-white'}`
-            }
-          >
-            Generate CV
-          </NavLink>
-          <NavLink
-            to="/history"
-            className={({ isActive }) =>
-              `text-sm font-medium transition-colors ${isActive ? 'text-indigo-400' : 'text-slate-400 hover:text-white'}`
-            }
-          >
-            History
-          </NavLink>
+          {/* Desktop links */}
+          <div className="hidden sm:flex items-center gap-6">
+            {navLinks.map(l => (
+              <NavLink key={l.to} to={l.to} className={linkCls}>{l.label}</NavLink>
+            ))}
+            <button
+              onClick={handleLogout}
+              className="text-sm font-medium text-slate-400 hover:text-red-400 transition-colors"
+            >
+              Sign Out
+            </button>
+          </div>
+
+          {/* Mobile hamburger */}
           <button
-            onClick={handleLogout}
-            className="text-sm font-medium text-slate-400 hover:text-red-400 transition-colors"
+            className="sm:hidden p-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-700 transition"
+            onClick={() => setMenuOpen(v => !v)}
+            aria-label="Toggle menu"
           >
-            Sign Out
+            {menuOpen ? (
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            ) : (
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+              </svg>
+            )}
           </button>
         </div>
+
+        {/* Mobile dropdown */}
+        {menuOpen && (
+          <div className="sm:hidden border-t border-slate-700 py-3 space-y-1">
+            {navLinks.map(l => (
+              <NavLink
+                key={l.to}
+                to={l.to}
+                onClick={() => setMenuOpen(false)}
+                className={({ isActive }) =>
+                  `block px-3 py-2 rounded-lg text-sm font-medium transition-colors ${isActive ? 'bg-slate-700 text-indigo-400' : 'text-slate-400 hover:bg-slate-700 hover:text-white'}`
+                }
+              >
+                {l.label}
+              </NavLink>
+            ))}
+            <button
+              onClick={() => { setMenuOpen(false); handleLogout(); }}
+              className="w-full text-left px-3 py-2 rounded-lg text-sm font-medium text-slate-400 hover:bg-slate-700 hover:text-red-400 transition-colors"
+            >
+              Sign Out
+            </button>
+          </div>
+        )}
       </nav>
 
-      <main className="p-6">
+      {/* ── Page content ── */}
+      <main className="px-4 sm:px-6 py-6">
         <Outlet />
       </main>
     </div>

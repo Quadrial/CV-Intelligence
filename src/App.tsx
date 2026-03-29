@@ -2,12 +2,9 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import LoginPage from './pages/LoginPage';
 import ProfilePage from './pages/ProfilePage';
 import GeneratePage from './pages/GeneratePage';
+import HistoryPage from './pages/HistoryPage';
 import AuthGuard from './components/AuthGuard';
 import AppShell from './components/AppShell';
-
-function HistoryPage() {
-  return <div className="text-slate-300">History page — coming soon</div>;
-}
 
 export default function App() {
   return (
@@ -27,6 +24,7 @@ export default function App() {
           <Route path="generate" element={<GeneratePage />} />
           <Route path="history" element={<HistoryPage />} />
         </Route>
+        {/* Catch-all — redirect unknown routes to login */}
         <Route path="*" element={<Navigate to="/login" replace />} />
       </Routes>
     </BrowserRouter>
