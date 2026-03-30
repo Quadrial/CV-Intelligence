@@ -10,8 +10,10 @@ import {
   hasFreeTrial, remainingFree, type UserSettings,
 } from '../services/settingsService';
 import CVTemplate from '../components/CVTemplate';
+import TemplatePicker from '../components/TemplatePicker';
 import ApiKeyModal from '../components/ApiKeyModal';
 import type { CVProfile, TailoredCV } from '../types/cv';
+import type { TemplateId } from '../components/CVTemplate';
 
 type Step = 'input' | 'loading' | 'preview';
 
@@ -28,6 +30,7 @@ export default function GeneratePage() {
   const [toast, setToast] = useState<{ msg: string; type: 'error' | 'info' } | null>(null);
   const [showExportMenu, setShowExportMenu] = useState(false);
   const [showApiModal, setShowApiModal] = useState(false);
+  const [template, setTemplate] = useState<TemplateId>('modern');
   const [savingKey, setSavingKey] = useState(false);
   const exportRef = useRef<HTMLDivElement>(null);
   const pendingGenerate = useRef(false);
@@ -351,9 +354,15 @@ export default function GeneratePage() {
 
           {exportError && <div className="p-3 rounded-lg bg-red-900/40 border border-red-700 text-red-300 text-sm">{exportError}</div>}
 
+          {/* Template picker */}
+          <div className="bg-slate-800 border border-slate-700 rounded-xl px-5 py-4 space-y-2">
+            <p className="text-xs font-medium text-slate-400">Choose a template</p>
+            <TemplatePicker selected={template} onChange={setTemplate} />
+          </div>
+
           <div className="bg-slate-700 rounded-xl p-4 overflow-auto">
             <div className="max-w-[794px] mx-auto shadow-2xl rounded-lg overflow-hidden">
-              <CVTemplate cv={tailored} />
+              <CVTemplate cv={tailored} template={template} />
             </div>
           </div>
         </div>

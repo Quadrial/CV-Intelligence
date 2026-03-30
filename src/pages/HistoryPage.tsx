@@ -5,12 +5,15 @@ import { getHistory } from '../services/historyService';
 import { exportPDF, exportDocx, generateFileName } from '../services/exportService';
 import type { HistoryEntry, TailoredCV } from '../types/cv';
 import CVTemplate from '../components/CVTemplate';
+import TemplatePicker from '../components/TemplatePicker';
+import type { TemplateId } from '../components/CVTemplate';
 
 export default function HistoryPage() {
   const [entries, setEntries] = useState<HistoryEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [selected, setSelected] = useState<TailoredCV | null>(null);
+  const [template, setTemplate] = useState<TemplateId>('modern');
   const [showExportMenu, setShowExportMenu] = useState(false);
   const [exportError, setExportError] = useState('');
   const navigate = useNavigate();
@@ -151,9 +154,13 @@ export default function HistoryPage() {
                 </div>
 
                 {/* CV preview */}
+                <div className="bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 space-y-2">
+                  <p className="text-xs font-medium text-slate-400">Choose a template</p>
+                  <TemplatePicker selected={template} onChange={setTemplate} />
+                </div>
                 <div className="bg-slate-700 rounded-xl p-3 overflow-auto">
                   <div className="max-w-[794px] mx-auto shadow-2xl rounded-lg overflow-hidden">
-                    <CVTemplate cv={selected} />
+                    <CVTemplate cv={selected} template={template} />
                   </div>
                 </div>
               </div>
