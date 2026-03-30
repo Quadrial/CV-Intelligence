@@ -25,6 +25,7 @@ export default function GeneratePage() {
   const [tailored, setTailored] = useState<TailoredCV | null>(null);
   const [aiError, setAiError] = useState('');
   const [exportError, setExportError] = useState('');
+  const [toast, setToast] = useState<{ msg: string; type: 'error' | 'info' } | null>(null);
   const [showExportMenu, setShowExportMenu] = useState(false);
   const [showApiModal, setShowApiModal] = useState(false);
   const [savingKey, setSavingKey] = useState(false);
@@ -52,6 +53,11 @@ export default function GeneratePage() {
     return () => document.removeEventListener('mousedown', handler);
   }, []);
 
+  const showToast = (msg: string, type: 'error' | 'info' = 'error') => {
+    setToast({ msg, type });
+    setTimeout(() => setToast(null), 6000);
+  };
+
   const runGenerate = async (apiKey?: string) => {
     setStep('loading');
     setAiError('');
@@ -75,7 +81,9 @@ export default function GeneratePage() {
       await saveHistory(user.id, jobDescription, result).catch(() => {});
       setStep('preview');
     } catch (e: unknown) {
-      setAiError(e instanceof Error ? e.message : 'Something went wrong. Please try again.');
+      const msg = e instanceof Error ? e.message : 'Something went wrong. Please try again.';
+      setAiError(msg);
+      showToast(msg);
       setStep('input');
     }
   };
@@ -152,6 +160,24 @@ export default function GeneratePage() {
         />
       )}
 
+      {/* ── Toast notification ── */}
+      {toast && (
+        <div className={`fixed top-4 right-4 z-50 max-w-sm w-full shadow-2xl rounded-xl border p-4 flex items-start gap-3 animate-in
+          ${toast.type === 'error' ? 'bg-red-950 border-red-700 text-red-200' : 'bg-slate-800 border-slate-600 text-slate-200'}`}
+          style={{ animation: 'slideIn 0.2s ease-out' }}
+        >
+          <svg className="w-5 h-5 shrink-0 mt-0.5 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+          </svg>
+          <div className="flex-1 text-sm leading-relaxed">{toast.msg}</div>
+          <button onClick={() => setToast(null)} className="text-slate-500 hover:text-white transition shrink-0">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+      )}
+
       {/* Page header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
@@ -205,9 +231,9 @@ export default function GeneratePage() {
             </div>
 
             {aiError && (
-              <div className="flex items-start gap-2 p-3 rounded-lg bg-red-900/40 border border-red-700 text-red-300 text-sm">
-                <svg className="w-4 h-4 mt-0.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              <div className="flex items-start gap-2 p-3 rounded-lg bg-red-900/30 border border-red-800 text-red-300 text-xs">
+                <svg className="w-3.5 h-3.5 mt-0.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01" />
                 </svg>
                 {aiError}
               </div>

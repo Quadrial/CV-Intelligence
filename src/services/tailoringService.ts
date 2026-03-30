@@ -3,13 +3,26 @@ import type { CVProfile, TailoredCV } from '../types/cv';
 
 const APP_API_KEY = import.meta.env.VITE_GEMINI_API_KEY as string;
 
+function friendlyError(err: unknown): string {
+  const msg = err instanceof Error ? err.message : String(err);
+  if (/API_KEY_INVALID|key expired|API key expired/i.test(msg))
+    return 'The Gemini API key has expired or is invalid. Please add your own API key in your Profile settings to continue.';
+  if (/quota|rate.?limit|429/i.test(msg))
+    return 'Gemini API rate limit reached. Please wait a moment and try again, or add your own API key in Profile settings.';
+  if (/network|fetch|failed to fetch/i.test(msg))
+    return 'Network error — check your internet connection and try again.';
+  if (/invalid.?json|JSON/i.test(msg))
+    return 'AI returned an unexpected response. Please try again.';
+  return msg;
+}
+
 export async function tailorCV(
   profile: CVProfile,
   jobDescription: string,
   userApiKey?: string,
 ): Promise<TailoredCV> {
   const key = userApiKey?.trim() || APP_API_KEY;
-  if (!key) throw new Error('No Gemini API key available.');
+  if (!key) throw new Error('No Gemini API key configured. Add your own key in Profile settings.');
 
   const genAI = new GoogleGenerativeAI(key);
   const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
@@ -57,21 +70,24 @@ ${jobDescription.substring(0, 8000)}
 CANDIDATE CV PROFILE:
 ${JSON.stringify(profile, null, 2)}`;
 
-  const result = await model.generateContent(prompt);
-  const text = result.response.text().trim();
-
-  const clean = text
-    .replace(/^```(?:json)?\s*/i, '')
-    .replace(/\s*```$/, '')
-    .trim();
-
   try {
-    return JSON.parse(clean) as TailoredCV;
-  } catch {
-    const match = clean.match(/\{[\s\S]*\}/);
-    if (match) {
-      try { return JSON.parse(match[0]) as TailoredCV; } catch { /* fall through */ }
+    const result = await model.generateContent(prompt);
+    const text = result.response.text().trim();
+    const clean = text
+      .replace(/^```(?:json)?\s*/i, '')
+      .replace(/\s*```$/, '')
+      .trim();
+
+    try {
+      return JSON.parse(clean) as TailoredCV;
+    } catch {
+      const match = clean.match(/\{[\s\S]*\}/);
+      if (match) {
+        try { return JSON.parse(match[0]) as TailoredCV; } catch { /* fall through */ }
+      }
+      throw new Error('AI returned invalid JSON. Please try again.');
     }
-    throw new Error('AI returned invalid JSON. Please try again.');
+  } catch (err) {
+    throw new Error(friendlyError(err));
   }
 }

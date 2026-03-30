@@ -168,3 +168,25 @@ Incremental implementation starting with project setup and auth, then profile ma
 - Each task references specific requirements for traceability
 - Property tests use `fast-check` with minimum 100 iterations per test
 - Unit tests cover specific examples and edge cases not covered by property tests
+
+
+Here are the most impactful things you could add, grouped by priority:
+
+High impact, relatively easy
+
+Multiple CV templates — let users pick from 2–3 layouts (minimal, modern, classic) before downloading. Right now everyone gets the same look.
+Cover letter generator — same idea, paste the job description and generate a tailored cover letter alongside the CV. Very high demand.
+ATS score — after generating, show a rough score of how well the CV matches the job description keywords. Gemini can do this in the same call.
+Password reset flow — right now there's no "forgot password" link on the login page.
+Medium impact
+
+CV sections toggle — let users choose which sections appear in the output (e.g. hide Publications if not relevant). Some users don't have all sections.
+Edit tailored CV before download — show the preview as an editable form so users can tweak the AI output before exporting.
+Job tracker — a simple table where users log jobs they've applied to, linked to the CV they generated. Keeps everything in one place.
+Email the CV — send the generated PDF directly to an email address from the app.
+Nice to have
+
+Dark/light mode for the CV preview — some users prefer a white preview on a white background.
+Onboarding tour — a short 3-step walkthrough for new users (fill profile → paste job → download).
+Usage analytics dashboard — show the user how many CVs they've generated, which roles, over time.
+LinkedIn import — let users paste their LinkedIn profile URL or upload a LinkedIn PDF export to auto-fill the profile form (LinkedIn exports are standard PDFs).
