@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import { getProfile, saveProfile } from '../services/profileService';
+import { getSettings, savePersonalApiKey, type UserSettings } from '../services/settingsService';
 import { parseCVFile } from '../utils/cvParser';
 import type {
   CVProfile, WorkExperience, Education, TechnicalProject, Certification, Publication,
@@ -85,14 +86,20 @@ export default function ProfilePage() {
   const [saving, setSaving] = useState(false);
   const [parsing, setParsing] = useState(false);
   const [toast, setToast] = useState<{ type: 'success' | 'error'; msg: string } | null>(null);
+  const [settings, setSettings] = useState<UserSettings | null>(null);
+  const [apiKey, setApiKey] = useState('');
+  const [showApiKey, setShowApiKey] = useState(false);
+  const [savingKey, setSavingKey] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     (async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
-      const saved = await getProfile(user.id);
+      const [saved, s] = await Promise.all([getProfile(user.id), getSettings(user.id)]);
       if (saved) setProfile(saved);
+      setSettings(s);
+      setApiKey(s.personalApiKey ?? '');
       setLoading(false);
     })();
   }, []);
@@ -132,6 +139,21 @@ export default function ProfilePage() {
     } finally {
       setParsing(false);
       if (fileRef.current) fileRef.current.value = '';
+    }
+  };
+
+  const handleSaveKey = async () => {
+    setSavingKey(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Not authenticated');
+      await savePersonalApiKey(user.id, apiKey);
+      setSettings(prev => prev ? { ...prev, personalApiKey: apiKey } : prev);
+      showToast('success', 'API key saved.');
+    } catch (e: unknown) {
+      showToast('error', e instanceof Error ? e.message : 'Failed to save key.');
+    } finally {
+      setSavingKey(false);
     }
   };
 
@@ -496,6 +518,64 @@ export default function ProfilePage() {
             </svg>
             Add Publication
           </button>
+        </div>
+      </Section>
+
+      {/* ── API Key Settings ── */}
+      <Section title="Gemini API Key">
+        <div className="space-y-3">
+          <p className="text-xs text-slate-400">
+            You get 2 free CV generations on us. Add your own free Gemini API key for unlimited use.{' '}
+            <a
+              href="https://aistudio.google.com/app/apikey"
+              target="_blank"
+              rel="noreferrer"
+              className="text-indigo-400 hover:text-indigo-300 underline"
+            >
+              Get a free key here ↗
+            </a>
+          </p>
+          {settings && (
+            <p className={`text-xs font-medium ${settings.personalApiKey ? 'text-emerald-400' : 'text-amber-400'}`}>
+              {settings.personalApiKey
+                ? '✓ Personal API key saved — unlimited generations active'
+                : `${Math.max(0, 2 - settings.freeUsageCount)} free generation(s) remaining`}
+            </p>
+          )}
+          <div className="flex gap-2">
+            <div className="relative flex-1">
+              <input
+                type={showApiKey ? 'text' : 'password'}
+                value={apiKey}
+                onChange={e => setApiKey(e.target.value)}
+                placeholder="AIza..."
+                className={inputCls}
+              />
+              <button
+                type="button"
+                onClick={() => setShowApiKey(v => !v)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white transition"
+              >
+                {showApiKey ? (
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
+                  </svg>
+                ) : (
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                  </svg>
+                )}
+              </button>
+            </div>
+            <button
+              onClick={handleSaveKey}
+              disabled={savingKey || !apiKey.trim()}
+              className="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 text-white text-sm font-semibold transition shrink-0"
+            >
+              {savingKey ? 'Saving...' : 'Save Key'}
+            </button>
+          </div>
         </div>
       </Section>
 

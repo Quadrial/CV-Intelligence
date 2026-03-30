@@ -1,12 +1,17 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import type { CVProfile, TailoredCV } from '../types/cv';
 
-const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY as string;
+const APP_API_KEY = import.meta.env.VITE_GEMINI_API_KEY as string;
 
-export async function tailorCV(profile: CVProfile, jobDescription: string): Promise<TailoredCV> {
-  if (!GEMINI_API_KEY) throw new Error('Gemini API key not configured. Add VITE_GEMINI_API_KEY to your .env file.');
+export async function tailorCV(
+  profile: CVProfile,
+  jobDescription: string,
+  userApiKey?: string,
+): Promise<TailoredCV> {
+  const key = userApiKey?.trim() || APP_API_KEY;
+  if (!key) throw new Error('No Gemini API key available.');
 
-  const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
+  const genAI = new GoogleGenerativeAI(key);
   const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
 
   const prompt = `You are an expert CV writer and career coach. Your job is to tailor a candidate's CV to a specific job description so it passes ATS screening and impresses hiring managers.
@@ -16,7 +21,7 @@ STRICT RULES — follow every one:
 2. Work Experience, Technical Projects, and Education sections must be copied EXACTLY as provided — same entries, same descriptions, same dates. Only reorder experience entries to put the most relevant role first.
 3. The following sections MUST be actively rewritten/filtered based on the job description:
    - tailoredSummary: Write a compelling 3–4 sentence summary that directly references the job title, key requirements from the job description, and the candidate's most relevant experience. Make it specific to THIS job.
-   - technicalSkills: From the candidate's skills, select and reorder those most relevant to the job. Put the most job-relevant skills first. Add any skills from the job description that genuinely match what the candidate has listed.
+   - technicalSkills: From the candidate's skills, select and reorder those most relevant to the job. Put the most job-relevant skills first.
    - softSkills: Select and reorder soft skills most relevant to the job description.
    - certifications: Keep all certifications but put the most relevant ones first.
    - memberships: Keep as-is or lightly reword to emphasise relevance to the role.
@@ -55,7 +60,6 @@ ${JSON.stringify(profile, null, 2)}`;
   const result = await model.generateContent(prompt);
   const text = result.response.text().trim();
 
-  // Strip any accidental markdown fences
   const clean = text
     .replace(/^```(?:json)?\s*/i, '')
     .replace(/\s*```$/, '')
@@ -64,7 +68,6 @@ ${JSON.stringify(profile, null, 2)}`;
   try {
     return JSON.parse(clean) as TailoredCV;
   } catch {
-    // Try to extract JSON object if there's surrounding text
     const match = clean.match(/\{[\s\S]*\}/);
     if (match) {
       try { return JSON.parse(match[0]) as TailoredCV; } catch { /* fall through */ }

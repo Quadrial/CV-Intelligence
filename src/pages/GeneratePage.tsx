@@ -5,7 +5,12 @@ import { getProfile } from '../services/profileService';
 import { tailorCV } from '../services/tailoringService';
 import { saveHistory } from '../services/historyService';
 import { exportPDF, exportDocx, generateFileName } from '../services/exportService';
+import {
+  getSettings, incrementUsage, savePersonalApiKey,
+  hasFreeTrial, remainingFree, type UserSettings,
+} from '../services/settingsService';
 import CVTemplate from '../components/CVTemplate';
+import ApiKeyModal from '../components/ApiKeyModal';
 import type { CVProfile, TailoredCV } from '../types/cv';
 
 type Step = 'input' | 'loading' | 'preview';
@@ -13,6 +18,7 @@ type Step = 'input' | 'loading' | 'preview';
 export default function GeneratePage() {
   const [profile, setProfile] = useState<CVProfile | null>(null);
   const [profileLoading, setProfileLoading] = useState(true);
+  const [settings, setSettings] = useState<UserSettings | null>(null);
   const [jobDescription, setJobDescription] = useState('');
   const [jdError, setJdError] = useState('');
   const [step, setStep] = useState<Step>('input');
@@ -20,19 +26,22 @@ export default function GeneratePage() {
   const [aiError, setAiError] = useState('');
   const [exportError, setExportError] = useState('');
   const [showExportMenu, setShowExportMenu] = useState(false);
+  const [showApiModal, setShowApiModal] = useState(false);
+  const [savingKey, setSavingKey] = useState(false);
   const exportRef = useRef<HTMLDivElement>(null);
+  const pendingGenerate = useRef(false);
 
   useEffect(() => {
     (async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
-      const p = await getProfile(user.id);
+      const [p, s] = await Promise.all([getProfile(user.id), getSettings(user.id)]);
       setProfile(p);
+      setSettings(s);
       setProfileLoading(false);
     })();
   }, []);
 
-  // Close export dropdown on outside click
   useEffect(() => {
     const handler = (e: MouseEvent) => {
       if (exportRef.current && !exportRef.current.contains(e.target as Node)) {
@@ -43,31 +52,67 @@ export default function GeneratePage() {
     return () => document.removeEventListener('mousedown', handler);
   }, []);
 
-  const handleGenerate = async () => {
-    setJdError('');
-    setAiError('');
-
-    if (!jobDescription.trim()) {
-      setJdError('Please paste a job description before generating.');
-      return;
-    }
-    if (!profile) return; // button is disabled anyway
-
+  const runGenerate = async (apiKey?: string) => {
     setStep('loading');
+    setAiError('');
     try {
-      const result = await tailorCV(profile, jobDescription);
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user || !profile) throw new Error('Not authenticated.');
+
+      // Use app key only if within free limit and no personal key
+      const useAppKey = !apiKey && settings && hasFreeTrial(settings);
+      const keyToUse = apiKey || (useAppKey ? undefined : settings?.personalApiKey);
+
+      const result = await tailorCV(profile, jobDescription, keyToUse);
       setTailored(result);
 
-      // Save to history
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        await saveHistory(user.id, jobDescription, result).catch(() => {/* non-fatal */});
+      // Increment free usage only when app key was used
+      if (useAppKey) {
+        await incrementUsage(user.id);
+        setSettings(prev => prev ? { ...prev, freeUsageCount: prev.freeUsageCount + 1 } : prev);
       }
 
+      await saveHistory(user.id, jobDescription, result).catch(() => {});
       setStep('preview');
     } catch (e: unknown) {
       setAiError(e instanceof Error ? e.message : 'Something went wrong. Please try again.');
       setStep('input');
+    }
+  };
+
+  const handleGenerate = async () => {
+    setJdError('');
+    setAiError('');
+    if (!jobDescription.trim()) { setJdError('Please paste a job description before generating.'); return; }
+    if (!profile || !settings) return;
+
+    // Has personal key → use it directly
+    if (settings.personalApiKey) { await runGenerate(settings.personalApiKey); return; }
+
+    // Still has free uses
+    if (hasFreeTrial(settings)) { await runGenerate(); return; }
+
+    // Out of free uses, no personal key → show modal
+    pendingGenerate.current = true;
+    setShowApiModal(true);
+  };
+
+  const handleSaveKey = async (key: string) => {
+    setSavingKey(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Not authenticated.');
+      await savePersonalApiKey(user.id, key);
+      setSettings(prev => prev ? { ...prev, personalApiKey: key } : prev);
+      setShowApiModal(false);
+      if (pendingGenerate.current) {
+        pendingGenerate.current = false;
+        await runGenerate(key);
+      }
+    } catch (e: unknown) {
+      setAiError(e instanceof Error ? e.message : 'Failed to save key.');
+    } finally {
+      setSavingKey(false);
     }
   };
 
@@ -84,12 +129,7 @@ export default function GeneratePage() {
     }
   };
 
-  const handleReset = () => {
-    setStep('input');
-    setTailored(null);
-    setAiError('');
-    setExportError('');
-  };
+  const handleReset = () => { setStep('input'); setTailored(null); setAiError(''); setExportError(''); };
 
   if (profileLoading) {
     return (
@@ -99,12 +139,43 @@ export default function GeneratePage() {
     );
   }
 
+  const free = settings ? remainingFree(settings) : 0;
+  const hasOwnKey = !!settings?.personalApiKey;
+
   return (
     <div className="max-w-5xl mx-auto space-y-6 pb-16">
+      {showApiModal && (
+        <ApiKeyModal
+          onSave={handleSaveKey}
+          onClose={() => { setShowApiModal(false); pendingGenerate.current = false; }}
+          saving={savingKey}
+        />
+      )}
+
       {/* Page header */}
-      <div>
-        <h2 className="text-xl font-bold text-white">Generate Tailored CV</h2>
-        <p className="text-slate-400 text-sm mt-0.5">Paste a job description and we'll tailor your CV to match it.</p>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div>
+          <h2 className="text-xl font-bold text-white">Generate Tailored CV</h2>
+          <p className="text-slate-400 text-sm mt-0.5">Paste a job description and we'll tailor your CV to match it.</p>
+        </div>
+        {/* Usage badge */}
+        {settings && (
+          <div className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium border ${
+            hasOwnKey
+              ? 'bg-emerald-900/30 border-emerald-700 text-emerald-300'
+              : free > 0
+              ? 'bg-indigo-900/30 border-indigo-700 text-indigo-300'
+              : 'bg-amber-900/30 border-amber-700 text-amber-300'
+          }`}>
+            {hasOwnKey ? (
+              <><span className="w-1.5 h-1.5 rounded-full bg-emerald-400 inline-block" /> Using your API key — unlimited</>
+            ) : free > 0 ? (
+              <><span className="w-1.5 h-1.5 rounded-full bg-indigo-400 inline-block" /> {free} free generation{free !== 1 ? 's' : ''} remaining</>
+            ) : (
+              <><span className="w-1.5 h-1.5 rounded-full bg-amber-400 inline-block" /> Free limit reached — <button onClick={() => setShowApiModal(true)} className="underline hover:text-amber-200 ml-0.5">add your key</button></>
+            )}
+          </div>
+        )}
       </div>
 
       {/* No profile warning */}
@@ -113,14 +184,13 @@ export default function GeneratePage() {
           <svg className="w-5 h-5 mt-0.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
           </svg>
-          <span>You haven't saved a CV profile yet. <Link to="/profile" className="underline font-medium hover:text-amber-200">Complete your profile</Link> first so we have content to tailor.</span>
+          <span>You haven't saved a CV profile yet. <Link to="/profile" className="underline font-medium hover:text-amber-200">Complete your profile</Link> first.</span>
         </div>
       )}
 
       {/* ── INPUT STEP ── */}
       {step === 'input' && (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Job description */}
           <div className="lg:col-span-2 bg-slate-800 border border-slate-700 rounded-xl p-6 space-y-4">
             <div>
               <label className="block text-sm font-medium text-slate-300 mb-2">Job Description</label>
@@ -164,7 +234,6 @@ export default function GeneratePage() {
                 'Make sure your profile has detailed work experience with STAR-method descriptions.',
                 'The AI will reorder and emphasize the most relevant parts of your CV.',
                 'Review the preview before downloading — you can regenerate if needed.',
-                
               ].map((tip, i) => (
                 <li key={i} className="flex gap-2">
                   <span className="text-indigo-400 font-bold shrink-0">{i + 1}.</span>
@@ -175,9 +244,24 @@ export default function GeneratePage() {
 
             {profile && (
               <div className="pt-3 border-t border-slate-700">
-                <p className="text-xs text-slate-500 mb-2">Profile loaded</p>
+                <p className="text-xs text-slate-500 mb-1">Profile loaded</p>
                 <p className="text-sm font-medium text-white">{profile.fullName}</p>
-                <p className="text-xs text-slate-400">{profile.experience?.length ?? 0} experience entries · {profile.education?.length ?? 0} education entries</p>
+                <p className="text-xs text-slate-400">{profile.experience?.length ?? 0} roles · {profile.education?.length ?? 0} education entries</p>
+              </div>
+            )}
+
+            {/* API key shortcut */}
+            {!hasOwnKey && (
+              <div className="pt-3 border-t border-slate-700">
+                <button
+                  onClick={() => setShowApiModal(true)}
+                  className="w-full text-xs text-indigo-400 hover:text-indigo-300 transition flex items-center gap-1.5"
+                >
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
+                  </svg>
+                  Add your own API key for unlimited use
+                </button>
               </div>
             )}
           </div>
@@ -201,21 +285,15 @@ export default function GeneratePage() {
       {/* ── PREVIEW STEP ── */}
       {step === 'preview' && tailored && (
         <div className="space-y-4">
-          {/* Action bar */}
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 bg-slate-800 border border-slate-700 rounded-xl px-5 py-4">
             <div>
               <p className="text-white font-semibold text-sm">CV ready for download</p>
               <p className="text-slate-400 text-xs mt-0.5">Review the preview below, then download in your preferred format.</p>
             </div>
             <div className="flex items-center gap-3">
-              <button
-                onClick={handleReset}
-                className="px-4 py-2 rounded-lg border border-slate-600 text-slate-300 hover:border-slate-500 hover:text-white text-sm transition"
-              >
+              <button onClick={handleReset} className="px-4 py-2 rounded-lg border border-slate-600 text-slate-300 hover:border-slate-500 hover:text-white text-sm transition">
                 ← New Job
               </button>
-
-              {/* Export dropdown */}
               <div className="relative" ref={exportRef}>
                 <button
                   onClick={() => setShowExportMenu(v => !v)}
@@ -231,18 +309,12 @@ export default function GeneratePage() {
                 </button>
                 {showExportMenu && (
                   <div className="absolute right-0 mt-2 w-44 bg-slate-700 border border-slate-600 rounded-lg shadow-xl z-10 overflow-hidden">
-                    <button onClick={() => handleExport('pdf')}
-                      className="w-full flex items-center gap-3 px-4 py-3 text-sm text-slate-200 hover:bg-slate-600 transition">
-                      <svg className="w-4 h-4 text-red-400" fill="currentColor" viewBox="0 0 20 20">
-                        <path d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z" />
-                      </svg>
+                    <button onClick={() => handleExport('pdf')} className="w-full flex items-center gap-3 px-4 py-3 text-sm text-slate-200 hover:bg-slate-600 transition">
+                      <svg className="w-4 h-4 text-red-400" fill="currentColor" viewBox="0 0 20 20"><path d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z" /></svg>
                       Download PDF
                     </button>
-                    <button onClick={() => handleExport('docx')}
-                      className="w-full flex items-center gap-3 px-4 py-3 text-sm text-slate-200 hover:bg-slate-600 transition border-t border-slate-600">
-                      <svg className="w-4 h-4 text-blue-400" fill="currentColor" viewBox="0 0 20 20">
-                        <path d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z" />
-                      </svg>
+                    <button onClick={() => handleExport('docx')} className="w-full flex items-center gap-3 px-4 py-3 text-sm text-slate-200 hover:bg-slate-600 transition border-t border-slate-600">
+                      <svg className="w-4 h-4 text-blue-400" fill="currentColor" viewBox="0 0 20 20"><path d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z" /></svg>
                       Download Word
                     </button>
                   </div>
@@ -251,11 +323,8 @@ export default function GeneratePage() {
             </div>
           </div>
 
-          {exportError && (
-            <div className="p-3 rounded-lg bg-red-900/40 border border-red-700 text-red-300 text-sm">{exportError}</div>
-          )}
+          {exportError && <div className="p-3 rounded-lg bg-red-900/40 border border-red-700 text-red-300 text-sm">{exportError}</div>}
 
-          {/* CV Preview */}
           <div className="bg-slate-700 rounded-xl p-4 overflow-auto">
             <div className="max-w-[794px] mx-auto shadow-2xl rounded-lg overflow-hidden">
               <CVTemplate cv={tailored} />
