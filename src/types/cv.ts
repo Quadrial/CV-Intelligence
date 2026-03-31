@@ -91,3 +91,16 @@ export interface HistoryEntry {
   tailoredCV: TailoredCV;
   createdAt: string;
 }
+
+export interface AtsScore {
+  score: number;           // 0–100
+  matchedKeywords: string[];
+  missingKeywords: string[];
+  feedback: string;        // 2–3 sentence summary
+}
+
+export interface GenerateResult {
+  tailoredCV: TailoredCV;
+  atsScore: AtsScore;
+  coverLetter: string;     // plain text, ready to copy/download
+}
