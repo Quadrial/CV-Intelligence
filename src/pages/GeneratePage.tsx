@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { getProfile } from '../services/profileService';
 import { generateAll } from '../services/tailoringService';
-import { saveHistory } from '../services/historyService';
+import { saveHistory, updateHistory } from '../services/historyService';
 import { exportPDF, exportDocx, generateFileName } from '../services/exportService';
 import {
   getSettings, incrementUsage, savePersonalApiKey,
@@ -14,6 +14,7 @@ import TemplatePicker from '../components/TemplatePicker';
 import AtsScoreCard from '../components/AtsScoreCard';
 import CoverLetterPanel from '../components/CoverLetterPanel';
 import ApiKeyModal from '../components/ApiKeyModal';
+import EditableCVForm from '../components/EditableCVForm';
 import type { CVProfile, TailoredCV, AtsScore } from '../types/cv';
 import type { TemplateId } from '../components/CVTemplate';
 
@@ -30,6 +31,7 @@ export default function GeneratePage() {
   const [tailored, setTailored] = useState<TailoredCV | null>(null);
   const [atsScore, setAtsScore] = useState<AtsScore | null>(null);
   const [coverLetter, setCoverLetter] = useState('');
+  const [lastHistoryEntryId, setLastHistoryEntryId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<PreviewTab>('cv');
   const [template, setTemplate] = useState<TemplateId>('modern');
   const [aiError, setAiError] = useState('');
@@ -40,6 +42,7 @@ export default function GeneratePage() {
   const [savingKey, setSavingKey] = useState(false);
   const exportRef = useRef<HTMLDivElement>(null);
   const pendingGenerate = useRef(false);
+  const [isEditing, setIsEditing] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -67,6 +70,23 @@ export default function GeneratePage() {
     setTimeout(() => setToast(null), 6000);
   };
 
+  const saveEditedCV = async (updatedCV: TailoredCV) => {
+    setTailored(updatedCV);
+    setIsEditing(false);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      if (lastHistoryEntryId) {
+        await updateHistory(user.id, lastHistoryEntryId, updatedCV, coverLetter);
+      } else {
+        const saved = await saveHistory(user.id, jobDescription, updatedCV, coverLetter).catch(() => null);
+        if (saved) setLastHistoryEntryId(saved.id);
+      }
+    } catch {
+      // ignore history updates for edited CVs so the user can still continue
+    }
+  };
+
   const runGenerate = async (apiKey?: string) => {
     setStep('loading');
     setAiError('');
@@ -89,7 +109,8 @@ export default function GeneratePage() {
         setSettings(prev => prev ? { ...prev, freeUsageCount: prev.freeUsageCount + 1 } : prev);
       }
 
-      await saveHistory(user.id, jobDescription, result.tailoredCV).catch(() => {});
+      const saved = await saveHistory(user.id, jobDescription, result.tailoredCV, result.coverLetter).catch(() => null);
+      if (saved) setLastHistoryEntryId(saved.id);
       setStep('preview');
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : 'Something went wrong. Please try again.';
@@ -334,6 +355,12 @@ export default function GeneratePage() {
               <button onClick={handleReset} className="px-4 py-2 rounded-lg border border-slate-600 text-slate-300 hover:border-slate-500 hover:text-white text-sm transition">
                 ← New Job
               </button>
+              <button
+                onClick={() => setIsEditing(true)}
+                className="px-4 py-2 rounded-lg border border-slate-600 text-slate-300 hover:border-slate-500 hover:text-white text-sm transition"
+              >
+                Edit CV
+              </button>
               <div className="relative" ref={exportRef}>
                 <button
                   onClick={() => setShowExportMenu(v => !v)}
@@ -387,15 +414,25 @@ export default function GeneratePage() {
           {/* CV tab */}
           {activeTab === 'cv' && (
             <div className="space-y-3">
-              <div className="bg-slate-800 border border-slate-700 rounded-xl px-5 py-4 space-y-2">
-                <p className="text-xs font-medium text-slate-400">Choose a template</p>
-                <TemplatePicker selected={template} onChange={setTemplate} />
-              </div>
-              <div className="bg-slate-700 rounded-xl p-4 overflow-auto">
-                <div className="max-w-[794px] mx-auto shadow-2xl rounded-lg overflow-hidden">
-                  <CVTemplate cv={tailored} template={template} />
-                </div>
-              </div>
+              {isEditing ? (
+                <EditableCVForm
+                  cv={tailored}
+                  onSave={saveEditedCV}
+                  onCancel={() => setIsEditing(false)}
+                />
+              ) : (
+                <>
+                  <div className="bg-slate-800 border border-slate-700 rounded-xl px-5 py-4 space-y-2">
+                    <p className="text-xs font-medium text-slate-400">Choose a template</p>
+                    <TemplatePicker selected={template} onChange={setTemplate} />
+                  </div>
+                  <div className="bg-slate-700 rounded-xl p-4 overflow-auto">
+                    <div className="max-w-4xl mx-auto shadow-2xl rounded-lg overflow-hidden">
+                      <CVTemplate cv={tailored} template={template} />
+                    </div>
+                  </div>
+                </>
+              )}
             </div>
           )}
 

@@ -6,6 +6,7 @@ const navLinks = [
   { to: '/profile', label: 'Profile' },
   { to: '/generate', label: 'Generate CV' },
   { to: '/history', label: 'History' },
+  { to: '/tracker', label: 'Job Tracker' },
 ];
 
 export default function AppShell() {

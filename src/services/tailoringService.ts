@@ -2,18 +2,54 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 import type { CVProfile, GenerateResult } from '../types/cv';
 
 const APP_API_KEY = import.meta.env.VITE_GEMINI_API_KEY as string;
+const FALLBACK_API_KEY = import.meta.env.VITE_GEMINI_FALLBACK_API_KEY as string | undefined;
+const PRIMARY_MODEL = import.meta.env.VITE_GEMINI_MODEL ?? 'gemini-2.5-flash';
+const FALLBACK_MODEL = import.meta.env.VITE_GEMINI_FALLBACK_MODEL as string | undefined;
 
-function friendlyError(err: unknown): string {
+function getFriendlyError(err: unknown): string {
   const msg = err instanceof Error ? err.message : String(err);
-  if (/API_KEY_INVALID|key expired|API key expired/i.test(msg))
-    return 'The Gemini API key has expired or is invalid. Please add your own API key in your Profile settings to continue.';
+
+  if (/API_KEY_INVALID|key expired|API key expired|401|403|unauthorized/i.test(msg))
+    return 'The Gemini API key is invalid or expired. Add a valid API key in Profile settings.';
   if (/quota|rate.?limit|429/i.test(msg))
-    return 'Gemini API rate limit reached. Please wait a moment and try again, or add your own API key in Profile settings.';
-  if (/network|fetch|failed to fetch/i.test(msg))
-    return 'Network error — check your internet connection and try again.';
+    return 'Gemini API rate limit reached. Please wait a moment and try again.';
+  if (/503|Service Unavailable/i.test(msg))
+    return 'The Gemini service is temporarily unavailable. Please wait a moment and try again.';
+  if (/network|fetch|failed to fetch|timeout/i.test(msg))
+    return 'Network error — check your internet connection and try again. If the problem persists, the AI service may be unavailable.';
   if (/invalid.?json|JSON/i.test(msg))
     return 'AI returned an unexpected response. Please try again.';
   return msg;
+}
+
+function isRetryableError(err: unknown): boolean {
+  const msg = err instanceof Error ? err.message : String(err);
+  return /network|fetch|failed to fetch|timeout|503|500|Service Unavailable|rate.?limit|429|API_KEY_INVALID|key expired|API key expired|401|403|unauthorized/i.test(msg);
+}
+
+async function callGenerativeModel(
+  apiKey: string,
+  model: string,
+  prompt: string,
+): Promise<GenerateResult> {
+  const genAI = new GoogleGenerativeAI(apiKey);
+  const modelClient = genAI.getGenerativeModel({ model });
+  const result = await modelClient.generateContent(prompt);
+  const text = result.response.text().trim();
+  const clean = text
+    .replace(/^```(?:json)?\s*/i, '')
+    .replace(/\s*```$/, '')
+    .trim();
+
+  try {
+    return JSON.parse(clean) as GenerateResult;
+  } catch {
+    const match = clean.match(/\{[\s\S]*\}/);
+    if (match) {
+      try { return JSON.parse(match[0]) as GenerateResult; } catch { /* fall through */ }
+    }
+    throw new Error('AI returned invalid JSON. Please try again.');
+  }
 }
 
 export async function generateAll(
@@ -21,11 +57,16 @@ export async function generateAll(
   jobDescription: string,
   userApiKey?: string,
 ): Promise<GenerateResult> {
-  const key = userApiKey?.trim() || APP_API_KEY;
-  if (!key) throw new Error('No Gemini API key configured. Add your own key in Profile settings.');
+  const userKey = userApiKey?.trim();
+  const keys = [
+    ...(userKey ? [userKey] : []),
+    ...(APP_API_KEY ? [APP_API_KEY] : []),
+    ...(FALLBACK_API_KEY ? [FALLBACK_API_KEY] : []),
+  ].filter((value, index, self) => value && self.indexOf(value) === index) as string[];
 
-  const genAI = new GoogleGenerativeAI(key);
-  const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
+  if (!keys.length) throw new Error('No Gemini API key configured. Add your own key in Profile settings.');
+
+  const models = [PRIMARY_MODEL, ...(FALLBACK_MODEL ? [FALLBACK_MODEL] : [])];
 
   const prompt = `You are an expert CV writer, career coach, and ATS specialist. Given a candidate's CV profile and a job description, produce three things in a single JSON response.
 
@@ -79,24 +120,17 @@ ${jobDescription.substring(0, 8000)}
 CANDIDATE CV PROFILE:
 ${JSON.stringify(profile, null, 2)}`;
 
-  try {
-    const result = await model.generateContent(prompt);
-    const text = result.response.text().trim();
-    const clean = text
-      .replace(/^```(?:json)?\s*/i, '')
-      .replace(/\s*```$/, '')
-      .trim();
-
-    try {
-      return JSON.parse(clean) as GenerateResult;
-    } catch {
-      const match = clean.match(/\{[\s\S]*\}/);
-      if (match) {
-        try { return JSON.parse(match[0]) as GenerateResult; } catch { /* fall through */ }
+  let lastError: unknown = new Error('Unknown error');
+  for (const model of models) {
+    for (const apiKey of keys) {
+      try {
+        return await callGenerativeModel(apiKey, model, prompt);
+      } catch (err) {
+        lastError = err;
+        if (!isRetryableError(err)) throw err;
       }
-      throw new Error('AI returned invalid JSON. Please try again.');
     }
-  } catch (err) {
-    throw new Error(friendlyError(err));
   }
+
+  throw new Error(getFriendlyError(lastError));
 }

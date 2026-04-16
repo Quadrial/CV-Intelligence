@@ -82,6 +82,7 @@ export interface TailoredCV {
   memberships: string;
   awards: string;
   publications: Publication[];
+  coverLetter?: string;
 }
 
 export interface HistoryEntry {
@@ -89,6 +90,7 @@ export interface HistoryEntry {
   userId: string;
   jobDescriptionSnippet: string;
   tailoredCV: TailoredCV;
+  coverLetter?: string;
   createdAt: string;
 }
 
