@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
-import { getHistory, deleteHistory } from '../services/historyService';
+import { getHistory, deleteHistory, updateHistory } from '../services/historyService';
 import { exportPDF, exportDocx, generateFileName } from '../services/exportService';
-import type { HistoryEntry } from '../types/cv';
+import type { HistoryEntry, TailoredCV } from '../types/cv';
 import CVTemplate from '../components/CVTemplate';
 import TemplatePicker from '../components/TemplatePicker';
+import EditableCVForm from '../components/EditableCVForm';
 import type { TemplateId } from '../components/CVTemplate';
 
 export default function HistoryPage() {
@@ -17,6 +18,7 @@ export default function HistoryPage() {
   const [activeTab, setActiveTab] = useState<'cv' | 'cover'>('cv');
   const [showExportMenu, setShowExportMenu] = useState(false);
   const [exportError, setExportError] = useState('');
+  const [isEditing, setIsEditing] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -59,6 +61,34 @@ export default function HistoryPage() {
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Could not delete history entry.');
     }
+  };
+
+  const saveEditedCV = async (updatedCV: TailoredCV) => {
+    if (!selected) return;
+    const updatedEntry = { ...selected, tailoredCV: updatedCV };
+    setSelected(updatedEntry);
+    setEntries(prev => prev.map(e => e.id === selected.id ? updatedEntry : e));
+    setIsEditing(false);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      await updateHistory(user.id, selected.id, updatedCV, selected.coverLetter ?? '');
+    } catch {
+      // non-fatal — local state already updated
+    }
+  };
+
+  const handleMailto = async () => {
+    if (!selected) return;
+    try {
+      const fileName = generateFileName(selected.tailoredCV.fullName, 'pdf');
+      await exportPDF(selected.tailoredCV, fileName);
+    } catch { /* non-fatal */ }
+    const subject = encodeURIComponent(`CV Application — ${selected.tailoredCV.fullName}`);
+    const body = encodeURIComponent(
+      `Please find my tailored CV attached.\n\nBest regards,\n${selected.tailoredCV.fullName}\n${selected.tailoredCV.email}\n${selected.tailoredCV.phone}`
+    );
+    window.location.href = `mailto:?subject=${subject}&body=${body}`;
   };
 
   if (loading) {
@@ -115,7 +145,7 @@ export default function HistoryPage() {
               >
                 <button
                   type="button"
-                  onClick={() => { setSelected(entry); setActiveTab('cv'); setExportError(''); }}
+                  onClick={() => { setSelected(entry); setActiveTab('cv'); setExportError(''); setIsEditing(false); }}
                   className="w-full text-left"
                 >
                   <p className="text-white text-sm font-semibold line-clamp-2">{entry.jobDescriptionSnippet}</p>
@@ -149,12 +179,28 @@ export default function HistoryPage() {
                     <p className="text-slate-400 text-sm mt-1 line-clamp-2">{selected.jobDescriptionSnippet}</p>
                     {exportError && <p className="text-red-400 text-xs mt-2">{exportError}</p>}
                   </div>
-                  <div className="flex flex-wrap items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                     <button
                       onClick={() => handleDelete(selected.id)}
                       className="px-3 py-2 rounded-lg border border-red-600 text-red-300 text-xs font-semibold hover:bg-red-700/10 transition"
                     >
                       Delete Entry
+                    </button>
+                    <button
+                      onClick={() => { setIsEditing(true); setActiveTab('cv'); }}
+                      className="px-3 py-2 rounded-lg border border-slate-600 text-slate-300 hover:border-slate-500 hover:text-white text-xs font-semibold transition"
+                    >
+                      Edit CV
+                    </button>
+                    <button
+                      onClick={handleMailto}
+                      className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-slate-600 text-slate-300 hover:border-emerald-500 hover:text-emerald-300 text-xs font-semibold transition"
+                      title="Downloads your CV as PDF then opens your email client"
+                    >
+                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                      </svg>
+                      Email CV
                     </button>
                     <div className="relative" aria-live="polite">
                       <button
@@ -202,17 +248,25 @@ export default function HistoryPage() {
                 </div>
 
                 {activeTab === 'cv' ? (
-                  <>
-                    <div className="bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 space-y-2">
-                      <p className="text-xs font-medium text-slate-400">Choose a template</p>
-                      <TemplatePicker selected={template} onChange={setTemplate} />
-                    </div>
-                    <div className="bg-slate-700 rounded-xl p-4 overflow-auto">
-                      <div className="max-w-4xl mx-auto shadow-2xl rounded-lg overflow-hidden">
-                        <CVTemplate cv={selected.tailoredCV} template={template} />
+                  isEditing ? (
+                    <EditableCVForm
+                      cv={selected.tailoredCV}
+                      onSave={saveEditedCV}
+                      onCancel={() => setIsEditing(false)}
+                    />
+                  ) : (
+                    <>
+                      <div className="bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 space-y-2">
+                        <p className="text-xs font-medium text-slate-400">Choose a template</p>
+                        <TemplatePicker selected={template} onChange={setTemplate} />
                       </div>
-                    </div>
-                  </>
+                      <div className="bg-slate-700 rounded-xl p-4 overflow-auto">
+                        <div className="max-w-4xl mx-auto shadow-2xl rounded-lg overflow-hidden">
+                          <CVTemplate cv={selected.tailoredCV} template={template} />
+                        </div>
+                      </div>
+                    </>
+                  )
                 ) : (
                   <div className="bg-slate-700 rounded-xl p-6 space-y-4 text-sm text-slate-200">
                     <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">

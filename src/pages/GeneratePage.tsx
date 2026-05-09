@@ -182,6 +182,20 @@ export default function GeneratePage() {
     }
   };
 
+  const handleMailto = async () => {
+    if (!tailored) return;
+    try {
+      const fileName = generateFileName(tailored.fullName, 'pdf');
+      await exportPDF(tailored, fileName);
+    } catch { /* non-fatal — still open mail client */ }
+
+    const subject = encodeURIComponent(`CV Application — ${tailored.fullName}`);
+    const body = encodeURIComponent(
+      `Please find my tailored CV attached.\n\nBest regards,\n${tailored.fullName}\n${tailored.email}\n${tailored.phone}`
+    );
+    window.location.href = `mailto:?subject=${subject}&body=${body}`;
+  };
+
   const handleReset = () => {
     setStep('input');
     setTailored(null);
@@ -379,6 +393,16 @@ export default function GeneratePage() {
                 className="px-4 py-2 rounded-lg border border-slate-600 text-slate-300 hover:border-slate-500 hover:text-white text-sm transition"
               >
                 Edit CV
+              </button>
+              <button
+                onClick={handleMailto}
+                className="flex items-center gap-2 px-4 py-2 rounded-lg border border-slate-600 text-slate-300 hover:border-emerald-500 hover:text-emerald-300 text-sm transition"
+                title="Downloads your CV as PDF then opens your email client"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                </svg>
+                <span className="hidden sm:inline">Email CV</span>
               </button>
               <div className="relative" ref={exportRef}>
                 <button

@@ -4,6 +4,7 @@ import ProfilePage from './pages/ProfilePage';
 import GeneratePage from './pages/GeneratePage';
 import HistoryPage from './pages/HistoryPage';
 import JobTrackerPage from './pages/JobTrackerPage';
+import ResetPasswordPage from './pages/ResetPasswordPage';
 import AuthGuard from './components/AuthGuard';
 import AppShell from './components/AppShell';
 
@@ -12,6 +13,7 @@ export default function App() {
     <BrowserRouter>
       <Routes>
         <Route path="/login" element={<LoginPage />} />
+        <Route path="/reset-password" element={<ResetPasswordPage />} />
         <Route
           path="/"
           element={
