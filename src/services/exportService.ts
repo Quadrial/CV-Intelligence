@@ -1,5 +1,15 @@
 import type { TailoredCV } from '../types/cv';
 
+type CVSectionVisibility = {
+  projects: boolean;
+  certifications: boolean;
+  memberships: boolean;
+  awards: boolean;
+  publications: boolean;
+  researchInterests: boolean;
+  references: boolean;
+};
+
 export function generateFileName(fullName: string, ext: 'pdf' | 'docx'): string {
   const date = new Date().toISOString().split('T')[0];
   const name = fullName.trim().replace(/\s+/g, '_');
@@ -15,7 +25,18 @@ function toSkillArray(text: string): string[] {
   return text.split(/[,\n]/).map(s => s.trim()).filter(Boolean);
 }
 
-export async function exportPDF(cv: TailoredCV, fileName: string): Promise<void> {
+export async function exportPDF(cv: TailoredCV, fileName: string, sectionVisibility?: CVSectionVisibility): Promise<void> {
+  const defaultVisibility: CVSectionVisibility = {
+    projects: true,
+    certifications: true,
+    memberships: true,
+    awards: true,
+    publications: true,
+    researchInterests: true,
+    references: true,
+  };
+  
+  const visibility = sectionVisibility || defaultVisibility;
   const { jsPDF } = await import('jspdf');
   const doc = new jsPDF({ unit: 'mm', format: 'a4' });
   const pageW = 210, margin = 18, contentW = pageW - margin * 2;
@@ -116,7 +137,7 @@ export async function exportPDF(cv: TailoredCV, fileName: string): Promise<void>
   }
 
   // 5. Technical Projects
-  if (cv.projects?.length) {
+  if (cv.projects?.length && visibility.projects) {
     sectionTitle('Technical Projects');
     cv.projects.forEach(proj => {
       checkY(12);
@@ -133,7 +154,7 @@ export async function exportPDF(cv: TailoredCV, fileName: string): Promise<void>
   }
 
   // 6. Certifications
-  if (cv.certifications?.length) {
+  if (cv.certifications?.length && visibility.certifications) {
     sectionTitle('Certifications');
     cv.certifications.forEach(cert => {
       checkY(6);
@@ -143,13 +164,32 @@ export async function exportPDF(cv: TailoredCV, fileName: string): Promise<void>
   }
 
   // 7. Memberships
-  if (cv.memberships) { sectionTitle('Professional Memberships'); bulletLines(cv.memberships); y += 3; }
+  if (cv.memberships && visibility.memberships) { sectionTitle('Professional Memberships'); bulletLines(cv.memberships); y += 3; }
 
   // 8. Awards
-  if (cv.awards) { sectionTitle('Awards & Honors'); bulletLines(cv.awards); y += 3; }
+  if (cv.awards && visibility.awards) { sectionTitle('Awards & Honors'); bulletLines(cv.awards); y += 3; }
 
-  // 9. Publications
-  if (cv.publications?.length) {
+  // 9. Research Interests
+  if (cv.researchInterests && visibility.researchInterests) { sectionTitle('Research Interests'); bodyText(cv.researchInterests); y += 3; }
+
+  // 10. References
+  if (cv.references?.length && visibility.references) {
+    sectionTitle('References');
+    cv.references.forEach(ref => {
+      checkY(6);
+      const line = [
+        [ref.prefix, ref.name].filter(Boolean).join(' '),
+        ref.relationship,
+        ref.phone,
+        ref.email,
+      ].filter(Boolean).join(' · ');
+      bodyText(`• ${line}`);
+    });
+    y += 3;
+  }
+
+  // 11. Publications
+  if (cv.publications?.length && visibility.publications) {
     sectionTitle('Research & Publications');
     cv.publications.forEach(pub => {
       checkY(6);
@@ -160,7 +200,18 @@ export async function exportPDF(cv: TailoredCV, fileName: string): Promise<void>
   doc.save(fileName);
 }
 
-export async function exportDocx(cv: TailoredCV, fileName: string): Promise<void> {
+export async function exportDocx(cv: TailoredCV, fileName: string, sectionVisibility?: CVSectionVisibility): Promise<void> {
+  const defaultVisibility: CVSectionVisibility = {
+    projects: true,
+    certifications: true,
+    memberships: true,
+    awards: true,
+    publications: true,
+    researchInterests: true,
+    references: true,
+  };
+  
+  const visibility = sectionVisibility || defaultVisibility;
   const { Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType, BorderStyle } = await import('docx');
 
   const heading = (text: string) => new Paragraph({
@@ -218,7 +269,7 @@ export async function exportDocx(cv: TailoredCV, fileName: string): Promise<void
   }
 
   // 5. Projects
-  if (cv.projects?.length) {
+  if (cv.projects?.length && visibility.projects) {
     paras.push(heading('Technical Projects'));
     cv.projects.forEach(proj => {
       paras.push(new Paragraph({ children: [bold(proj.name)] }));
@@ -230,7 +281,7 @@ export async function exportDocx(cv: TailoredCV, fileName: string): Promise<void
   }
 
   // 6. Certifications
-  if (cv.certifications?.length) {
+  if (cv.certifications?.length && visibility.certifications) {
     paras.push(heading('Certifications'));
     cv.certifications.forEach(cert =>
       paras.push(bullet(`${cert.name}${cert.issuer ? ` — ${cert.issuer}` : ''}${cert.year ? ` (${cert.year})` : ''}`))
@@ -238,13 +289,33 @@ export async function exportDocx(cv: TailoredCV, fileName: string): Promise<void
   }
 
   // 7. Memberships
-  if (cv.memberships) { paras.push(heading('Professional Memberships')); toBulletLines(cv.memberships).forEach(l => paras.push(bullet(l))); }
+  if (cv.memberships && visibility.memberships) { paras.push(heading('Professional Memberships')); toBulletLines(cv.memberships).forEach(l => paras.push(bullet(l))); }
 
   // 8. Awards
-  if (cv.awards) { paras.push(heading('Awards & Honors')); toBulletLines(cv.awards).forEach(l => paras.push(bullet(l))); }
+  if (cv.awards && visibility.awards) { paras.push(heading('Awards & Honors')); toBulletLines(cv.awards).forEach(l => paras.push(bullet(l))); }
 
-  // 9. Publications
-  if (cv.publications?.length) {
+  // 9. Research Interests
+  if (cv.researchInterests && visibility.researchInterests) {
+    paras.push(heading('Research Interests'));
+    paras.push(new Paragraph({ children: [normal(cv.researchInterests)] }));
+  }
+
+  // 10. References
+  if (cv.references?.length && visibility.references) {
+    paras.push(heading('References'));
+    cv.references.forEach(ref => {
+      const line = [
+        [ref.prefix, ref.name].filter(Boolean).join(' '),
+        ref.relationship,
+        ref.phone,
+        ref.email,
+      ].filter(Boolean).join(' · ');
+      paras.push(new Paragraph({ children: [normal(line)] }));
+    });
+  }
+
+  // 11. Publications
+  if (cv.publications?.length && visibility.publications) {
     paras.push(heading('Research & Publications'));
     cv.publications.forEach(pub =>
       paras.push(bullet(`${pub.title}${pub.year ? ` (${pub.year})` : ''}${pub.link ? ` — ${pub.link}` : ''}`))

@@ -1,6 +1,19 @@
 import type { TailoredCV } from '../../types/cv';
 
-interface Props { cv: TailoredCV; }
+type CVSectionVisibility = {
+  projects: boolean;
+  certifications: boolean;
+  memberships: boolean;
+  awards: boolean;
+  publications: boolean;
+  researchInterests: boolean;
+  references: boolean;
+};
+
+interface Props { 
+  cv: TailoredCV; 
+  sectionVisibility?: CVSectionVisibility;
+}
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
@@ -25,7 +38,18 @@ function BulletList({ text }: { text: string }) {
   );
 }
 
-export default function MinimalTemplate({ cv }: Props) {
+export default function MinimalTemplate({ cv, sectionVisibility }: Props) {
+  const defaultVisibility: CVSectionVisibility = {
+    projects: true,
+    certifications: true,
+    memberships: true,
+    awards: true,
+    publications: true,
+    researchInterests: true,
+    references: true,
+  };
+  
+  const visibility = sectionVisibility || defaultVisibility;
   const links = [
     cv.linkedinUrl && { label: 'linkedin', url: cv.linkedinUrl },
     cv.githubUrl && { label: 'github', url: cv.githubUrl },
@@ -91,7 +115,7 @@ export default function MinimalTemplate({ cv }: Props) {
         </Section>
       )}
 
-      {cv.projects?.length > 0 && (
+      {cv.projects?.length > 0 && visibility.projects && (
         <Section title="Projects">
           {cv.projects.map((proj, i) => (
             <div key={i} className="mb-3">
@@ -103,7 +127,7 @@ export default function MinimalTemplate({ cv }: Props) {
         </Section>
       )}
 
-      {cv.certifications?.length > 0 && (
+      {cv.certifications?.length > 0 && visibility.certifications && (
         <Section title="Certifications">
           {cv.certifications.map((cert, i) => (
             <p key={i} className="text-[11px] text-gray-600 mb-0.5">
@@ -113,10 +137,23 @@ export default function MinimalTemplate({ cv }: Props) {
         </Section>
       )}
 
-      {cv.memberships && <Section title="Memberships"><BulletList text={cv.memberships} /></Section>}
-      {cv.awards && <Section title="Awards"><BulletList text={cv.awards} /></Section>}
+      {cv.memberships && visibility.memberships && <Section title="Memberships"><BulletList text={cv.memberships} /></Section>}
+      {cv.awards && visibility.awards && <Section title="Awards"><BulletList text={cv.awards} /></Section>}
+      {cv.researchInterests && visibility.researchInterests && <Section title="Research Interests"><p className="text-[11px] text-gray-600 leading-relaxed">{cv.researchInterests}</p></Section>}
+      {cv.references?.length > 0 && visibility.references && (
+        <Section title="References">
+          <div className="space-y-3 text-[11px] text-gray-600 leading-relaxed">
+            {cv.references.map((ref, i) => (
+              <div key={i} className="space-y-0.5">
+                <p className="font-semibold text-gray-800">{[ref.prefix, ref.name].filter(Boolean).join(' ')}</p>
+                <p>{[ref.relationship, ref.phone, ref.email].filter(Boolean).join(' · ')}</p>
+              </div>
+            ))}
+          </div>
+        </Section>
+      )}
 
-      {cv.publications?.length > 0 && (
+      {cv.publications?.length > 0 && visibility.publications && (
         <Section title="Publications">
           {cv.publications.map((pub, i) => (
             <p key={i} className="text-[11px] text-gray-600 mb-0.5">

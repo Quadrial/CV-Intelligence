@@ -5,10 +5,36 @@ import ClassicTemplate from './templates/ClassicTemplate';
 
 export type TemplateId = 'modern' | 'minimal' | 'classic';
 
-interface Props { cv: TailoredCV; template: TemplateId; }
+type CVSectionVisibility = {
+  projects: boolean;
+  certifications: boolean;
+  memberships: boolean;
+  awards: boolean;
+  publications: boolean;
+  researchInterests: boolean;
+  references: boolean;
+};
 
-export default function CVTemplate({ cv, template }: Props) {
-  if (template === 'minimal') return <MinimalTemplate cv={cv} />;
-  if (template === 'classic') return <ClassicTemplate cv={cv} />;
-  return <ModernTemplate cv={cv} />;
+interface Props { 
+  cv: TailoredCV; 
+  template: TemplateId; 
+  sectionVisibility?: CVSectionVisibility;
+}
+
+export default function CVTemplate({ cv, template, sectionVisibility }: Props) {
+  const defaultVisibility: CVSectionVisibility = {
+    projects: true,
+    certifications: true,
+    memberships: true,
+    awards: true,
+    publications: true,
+    researchInterests: true,
+    references: true,
+  };
+  
+  const visibility = sectionVisibility || defaultVisibility;
+  
+  if (template === 'minimal') return <MinimalTemplate cv={cv} sectionVisibility={visibility} />;
+  if (template === 'classic') return <ClassicTemplate cv={cv} sectionVisibility={visibility} />;
+  return <ModernTemplate cv={cv} sectionVisibility={visibility} />;
 }

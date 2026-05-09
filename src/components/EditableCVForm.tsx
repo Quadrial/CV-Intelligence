@@ -1,246 +1,256 @@
 import { useState } from 'react';
-import type { TailoredCV } from '../types/cv';
+import type { TailoredCV, WorkExperience, TechnicalProject, Education, Certification, Publication, Reference } from '../types/cv';
 
-interface EditableCVFormProps {
+interface Props {
   cv: TailoredCV;
-  onSave: (updatedCV: TailoredCV) => void;
+  onSave: (updated: TailoredCV) => void;
   onCancel: () => void;
 }
 
-export default function EditableCVForm({ cv, onSave, onCancel }: EditableCVFormProps) {
-  const [editedCV, setEditedCV] = useState<TailoredCV>(cv);
+const inputCls = 'w-full px-3 py-2 rounded-lg bg-slate-600 border border-slate-500 text-white text-sm placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition';
+const textareaCls = inputCls + ' resize-none';
 
-  const updateField = (field: keyof TailoredCV, value: string | string[]) => {
-    setEditedCV(prev => ({ ...prev, [field]: value }));
-  };
+function SectionHead({ title }: { title: string }) {
+  return <h4 className="text-sm font-semibold text-indigo-400 uppercase tracking-wide mb-3">{title}</h4>;
+}
 
-  const updateExperience = (
-    index: number,
-    field: keyof TailoredCV['experience'][0],
-    value: string | null,
-  ) => {
-    const newExp = [...editedCV.experience];
-    newExp[index] = { ...newExp[index], [field]: value };
-    setEditedCV(prev => ({ ...prev, experience: newExp }));
-  };
+export default function EditableCVForm({ cv, onSave, onCancel }: Props) {
+  const [d, setD] = useState<TailoredCV>({ ...cv });
 
-  const updateProject = (index: number, field: keyof TailoredCV['projects'][0], value: string) => {
-    const newProj = [...editedCV.projects];
-    newProj[index] = { ...newProj[index], [field]: value };
-    setEditedCV(prev => ({ ...prev, projects: newProj }));
-  };
+  const set = (field: keyof TailoredCV, value: unknown) =>
+    setD(prev => ({ ...prev, [field]: value }));
 
-  const handleSave = () => {
-    onSave(editedCV);
-  };
+  // ── list helpers ──────────────────────────────────────────────────────────
+  function updateList<T>(field: keyof TailoredCV, idx: number, patch: Partial<T>) {
+    setD(prev => ({
+      ...prev,
+      [field]: (prev[field] as T[]).map((item, i) => i === idx ? { ...item, ...patch } : item),
+    }));
+  }
+  function removeFromList(field: keyof TailoredCV, idx: number) {
+    setD(prev => ({ ...prev, [field]: (prev[field] as unknown[]).filter((_, i) => i !== idx) }));
+  }
+  function addToList<T>(field: keyof TailoredCV, empty: T) {
+    setD(prev => ({ ...prev, [field]: [...(prev[field] as T[]), empty] }));
+  }
+
+  const removeBtn = (field: keyof TailoredCV, idx: number) => (
+    <button
+      type="button"
+      onClick={() => removeFromList(field, idx)}
+      className="absolute top-3 right-3 text-slate-500 hover:text-red-400 transition"
+    >
+      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+      </svg>
+    </button>
+  );
+
+  const addBtn = (label: string, onClick: () => void) => (
+    <button
+      type="button"
+      onClick={onClick}
+      className="flex items-center gap-1.5 text-xs text-indigo-400 hover:text-indigo-300 transition mt-2"
+    >
+      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+      </svg>
+      {label}
+    </button>
+  );
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
+      {/* Header */}
       <div className="flex items-center justify-between">
         <h3 className="text-lg font-semibold text-white">Edit Your CV</h3>
         <div className="flex gap-2">
-          <button
-            onClick={onCancel}
-            className="px-4 py-2 rounded-lg border border-slate-600 text-slate-300 hover:border-slate-500 hover:text-white text-sm transition"
-          >
+          <button onClick={onCancel} className="px-4 py-2 rounded-lg border border-slate-600 text-slate-300 hover:border-slate-500 hover:text-white text-sm transition">
             Cancel
           </button>
-          <button
-            onClick={handleSave}
-            className="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-semibold transition"
-          >
+          <button onClick={() => onSave(d)} className="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-semibold transition">
             Save Changes
           </button>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Contact Info */}
-        <div className="space-y-4">
-          <h4 className="text-sm font-medium text-slate-300">Contact Information</h4>
-          <div className="space-y-3">
-            <input
-              type="text"
-              value={editedCV.fullName}
-              onChange={e => updateField('fullName', e.target.value)}
-              className="w-full px-3 py-2 rounded-lg bg-slate-700 border border-slate-600 text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              placeholder="Full Name"
-            />
-            <input
-              type="text"
-              value={editedCV.phone}
-              onChange={e => updateField('phone', e.target.value)}
-              className="w-full px-3 py-2 rounded-lg bg-slate-700 border border-slate-600 text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              placeholder="Phone"
-            />
-            <input
-              type="email"
-              value={editedCV.email}
-              onChange={e => updateField('email', e.target.value)}
-              className="w-full px-3 py-2 rounded-lg bg-slate-700 border border-slate-600 text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              placeholder="Email"
-            />
-            <input
-              type="text"
-              value={editedCV.location}
-              onChange={e => updateField('location', e.target.value)}
-              className="w-full px-3 py-2 rounded-lg bg-slate-700 border border-slate-600 text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              placeholder="Location"
-            />
-          </div>
+      {/* ── Contact ── */}
+      <div>
+        <SectionHead title="Contact Information" />
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <input className={inputCls} value={d.fullName} placeholder="Full Name" onChange={e => set('fullName', e.target.value)} />
+          <input className={inputCls} value={d.phone} placeholder="Phone" onChange={e => set('phone', e.target.value)} />
+          <input className={inputCls} type="email" value={d.email} placeholder="Email" onChange={e => set('email', e.target.value)} />
+          <input className={inputCls} value={d.location} placeholder="Location" onChange={e => set('location', e.target.value)} />
+          <input className={inputCls} value={d.linkedinUrl ?? ''} placeholder="LinkedIn URL" onChange={e => set('linkedinUrl', e.target.value)} />
+          <input className={inputCls} value={d.githubUrl ?? ''} placeholder="GitHub URL" onChange={e => set('githubUrl', e.target.value)} />
+          <input className={inputCls} value={d.portfolioUrl ?? ''} placeholder="Portfolio URL" onChange={e => set('portfolioUrl', e.target.value)} />
         </div>
+      </div>
 
-        {/* Links */}
-        <div className="space-y-4">
-          <h4 className="text-sm font-medium text-slate-300">Links</h4>
-          <div className="space-y-3">
-            <input
-              type="url"
-              value={editedCV.linkedinUrl || ''}
-              onChange={e => updateField('linkedinUrl', e.target.value)}
-              className="w-full px-3 py-2 rounded-lg bg-slate-700 border border-slate-600 text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              placeholder="LinkedIn URL"
-            />
-            <input
-              type="url"
-              value={editedCV.githubUrl || ''}
-              onChange={e => updateField('githubUrl', e.target.value)}
-              className="w-full px-3 py-2 rounded-lg bg-slate-700 border border-slate-600 text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              placeholder="GitHub URL"
-            />
-            <input
-              type="url"
-              value={editedCV.portfolioUrl || ''}
-              onChange={e => updateField('portfolioUrl', e.target.value)}
-              className="w-full px-3 py-2 rounded-lg bg-slate-700 border border-slate-600 text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              placeholder="Portfolio URL"
-            />
+      {/* ── Summary ── */}
+      <div>
+        <SectionHead title="Professional Summary" />
+        <textarea className={textareaCls} rows={4} value={d.tailoredSummary} placeholder="Professional summary..." onChange={e => set('tailoredSummary', e.target.value)} />
+      </div>
+
+      {/* ── Skills ── */}
+      <div>
+        <SectionHead title="Core Competencies" />
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label className="text-xs text-slate-400 mb-1 block">Technical Skills</label>
+            <textarea className={textareaCls} rows={3} value={d.technicalSkills} placeholder="React, TypeScript, Node.js..." onChange={e => set('technicalSkills', e.target.value)} />
+          </div>
+          <div>
+            <label className="text-xs text-slate-400 mb-1 block">Soft Skills</label>
+            <textarea className={textareaCls} rows={3} value={d.softSkills} placeholder="Leadership, Communication..." onChange={e => set('softSkills', e.target.value)} />
           </div>
         </div>
       </div>
 
-      {/* Summary */}
-      <div className="space-y-3">
-        <h4 className="text-sm font-medium text-slate-300">Professional Summary</h4>
-        <textarea
-          value={editedCV.tailoredSummary}
-          onChange={e => updateField('tailoredSummary', e.target.value)}
-          rows={4}
-          className="w-full px-3 py-2 rounded-lg bg-slate-700 border border-slate-600 text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none"
-          placeholder="Your professional summary..."
-        />
-      </div>
-
-      {/* Skills */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      {/* ── Education ── */}
+      <div>
+        <SectionHead title="Education" />
         <div className="space-y-3">
-          <h4 className="text-sm font-medium text-slate-300">Technical Skills</h4>
-          <textarea
-            value={editedCV.technicalSkills}
-            onChange={e => updateField('technicalSkills', e.target.value)}
-            rows={3}
-            className="w-full px-3 py-2 rounded-lg bg-slate-700 border border-slate-600 text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none"
-            placeholder="Technical skills..."
-          />
+          {(d.education ?? []).map((edu, i) => (
+            <div key={i} className="relative bg-slate-700 rounded-lg p-4 space-y-2">
+              {removeBtn('education', i)}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <input className={inputCls} value={edu.degree} placeholder="Degree" onChange={e => updateList<Education>('education', i, { degree: e.target.value })} />
+                <input className={inputCls} value={edu.institution} placeholder="Institution" onChange={e => updateList<Education>('education', i, { institution: e.target.value })} />
+                <input className={inputCls} value={edu.graduationYear} placeholder="Graduation Year" onChange={e => updateList<Education>('education', i, { graduationYear: e.target.value })} />
+                <input className={inputCls} value={edu.honors ?? ''} placeholder="Honors (optional)" onChange={e => updateList<Education>('education', i, { honors: e.target.value })} />
+              </div>
+            </div>
+          ))}
+          {addBtn('Add Education', () => addToList<Education>('education', { degree: '', institution: '', graduationYear: '', honors: '' }))}
         </div>
+      </div>
+
+      {/* ── Experience ── */}
+      <div>
+        <SectionHead title="Work Experience" />
         <div className="space-y-3">
-          <h4 className="text-sm font-medium text-slate-300">Soft Skills</h4>
-          <textarea
-            value={editedCV.softSkills}
-            onChange={e => updateField('softSkills', e.target.value)}
-            rows={3}
-            className="w-full px-3 py-2 rounded-lg bg-slate-700 border border-slate-600 text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none"
-            placeholder="Soft skills..."
-          />
+          {(d.experience ?? []).map((exp, i) => (
+            <div key={i} className="relative bg-slate-700 rounded-lg p-4 space-y-2">
+              {removeBtn('experience', i)}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <input className={inputCls} value={exp.jobTitle} placeholder="Job Title" onChange={e => updateList<WorkExperience>('experience', i, { jobTitle: e.target.value })} />
+                <input className={inputCls} value={exp.company} placeholder="Company" onChange={e => updateList<WorkExperience>('experience', i, { company: e.target.value })} />
+                <input className={inputCls} value={exp.startDate} placeholder="Start Date" onChange={e => updateList<WorkExperience>('experience', i, { startDate: e.target.value })} />
+                <input className={inputCls} value={exp.endDate ?? ''} placeholder="End Date (blank = Present)" onChange={e => updateList<WorkExperience>('experience', i, { endDate: e.target.value || null })} />
+              </div>
+              <textarea className={textareaCls} rows={4} value={exp.description} placeholder="Description..." onChange={e => updateList<WorkExperience>('experience', i, { description: e.target.value })} />
+            </div>
+          ))}
+          {addBtn('Add Experience', () => addToList<WorkExperience>('experience', { jobTitle: '', company: '', startDate: '', endDate: null, description: '' }))}
         </div>
       </div>
 
-      {/* Experience */}
-      <div className="space-y-4">
-        <h4 className="text-sm font-medium text-slate-300">Work Experience</h4>
-        {editedCV.experience.map((exp, index) => (
-          <div key={index} className="bg-slate-700 rounded-lg p-4 space-y-3">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-              <input
-                type="text"
-                value={exp.jobTitle}
-                onChange={e => updateExperience(index, 'jobTitle', e.target.value)}
-                className="px-3 py-2 rounded-lg bg-slate-600 border border-slate-500 text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                placeholder="Job Title"
-              />
-              <input
-                type="text"
-                value={exp.company}
-                onChange={e => updateExperience(index, 'company', e.target.value)}
-                className="px-3 py-2 rounded-lg bg-slate-600 border border-slate-500 text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                placeholder="Company"
-              />
+      {/* ── Projects ── */}
+      <div>
+        <SectionHead title="Technical Projects" />
+        <div className="space-y-3">
+          {(d.projects ?? []).map((proj, i) => (
+            <div key={i} className="relative bg-slate-700 rounded-lg p-4 space-y-2">
+              {removeBtn('projects', i)}
+              <input className={inputCls} value={proj.name} placeholder="Project Name" onChange={e => updateList<TechnicalProject>('projects', i, { name: e.target.value })} />
+              <input className={inputCls} value={proj.techStack} placeholder="Tech Stack" onChange={e => updateList<TechnicalProject>('projects', i, { techStack: e.target.value })} />
+              <textarea className={textareaCls} rows={2} value={proj.description} placeholder="Description..." onChange={e => updateList<TechnicalProject>('projects', i, { description: e.target.value })} />
+              <textarea className={textareaCls} rows={2} value={proj.contribution} placeholder="Your contribution..." onChange={e => updateList<TechnicalProject>('projects', i, { contribution: e.target.value })} />
             </div>
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-              <input
-                type="text"
-                value={exp.startDate}
-                onChange={e => updateExperience(index, 'startDate', e.target.value)}
-                className="px-3 py-2 rounded-lg bg-slate-600 border border-slate-500 text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                placeholder="Start Date"
-              />
-              <input
-                type="text"
-                value={exp.endDate || ''}
-                onChange={e => updateExperience(index, 'endDate', e.target.value || null)}
-                className="px-3 py-2 rounded-lg bg-slate-600 border border-slate-500 text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                placeholder="End Date (leave empty if current)"
-              />
-            </div>
-            <textarea
-              value={exp.description}
-              onChange={e => updateExperience(index, 'description', e.target.value)}
-              rows={4}
-              className="w-full px-3 py-2 rounded-lg bg-slate-600 border border-slate-500 text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none"
-              placeholder="Job description..."
-            />
-          </div>
-        ))}
+          ))}
+          {addBtn('Add Project', () => addToList<TechnicalProject>('projects', { name: '', description: '', techStack: '', contribution: '' }))}
+        </div>
       </div>
 
-      {/* Projects */}
-      <div className="space-y-4">
-        <h4 className="text-sm font-medium text-slate-300">Technical Projects</h4>
-        {editedCV.projects.map((proj, index) => (
-          <div key={index} className="bg-slate-700 rounded-lg p-4 space-y-3">
-            <input
-              type="text"
-              value={proj.name}
-              onChange={e => updateProject(index, 'name', e.target.value)}
-              className="w-full px-3 py-2 rounded-lg bg-slate-600 border border-slate-500 text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              placeholder="Project Name"
-            />
-            <textarea
-              value={proj.description}
-              onChange={e => updateProject(index, 'description', e.target.value)}
-              rows={3}
-              className="w-full px-3 py-2 rounded-lg bg-slate-600 border border-slate-500 text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none"
-              placeholder="Project description..."
-            />
-            <input
-              type="text"
-              value={proj.techStack}
-              onChange={e => updateProject(index, 'techStack', e.target.value)}
-              className="w-full px-3 py-2 rounded-lg bg-slate-600 border border-slate-500 text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              placeholder="Tech Stack"
-            />
-            <textarea
-              value={proj.contribution}
-              onChange={e => updateProject(index, 'contribution', e.target.value)}
-              rows={3}
-              className="w-full px-3 py-2 rounded-lg bg-slate-600 border border-slate-500 text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none"
-              placeholder="Your contribution..."
-            />
-          </div>
-        ))}
+      {/* ── Certifications ── */}
+      <div>
+        <SectionHead title="Certifications" />
+        <div className="space-y-3">
+          {(d.certifications ?? []).map((cert, i) => (
+            <div key={i} className="relative bg-slate-700 rounded-lg p-4">
+              {removeBtn('certifications', i)}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                <input className={inputCls} value={cert.name} placeholder="Certificate Name" onChange={e => updateList<Certification>('certifications', i, { name: e.target.value })} />
+                <input className={inputCls} value={cert.issuer} placeholder="Issuer" onChange={e => updateList<Certification>('certifications', i, { issuer: e.target.value })} />
+                <input className={inputCls} value={cert.year} placeholder="Year" onChange={e => updateList<Certification>('certifications', i, { year: e.target.value })} />
+              </div>
+            </div>
+          ))}
+          {addBtn('Add Certification', () => addToList<Certification>('certifications', { name: '', issuer: '', year: '' }))}
+        </div>
       </div>
 
-      {/* Other sections can be added similarly */}
+      {/* ── Memberships ── */}
+      <div>
+        <SectionHead title="Professional Memberships" />
+        <textarea className={textareaCls} rows={3} value={d.memberships ?? ''} placeholder="IEEE Member, NSE..." onChange={e => set('memberships', e.target.value)} />
+      </div>
+
+      {/* ── Awards ── */}
+      <div>
+        <SectionHead title="Awards & Honors" />
+        <textarea className={textareaCls} rows={3} value={d.awards ?? ''} placeholder="Dean's List, scholarships..." onChange={e => set('awards', e.target.value)} />
+      </div>
+
+      {/* ── Publications ── */}
+      <div>
+        <SectionHead title="Research & Publications" />
+        <div className="space-y-3">
+          {(d.publications ?? []).map((pub, i) => (
+            <div key={i} className="relative bg-slate-700 rounded-lg p-4">
+              {removeBtn('publications', i)}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                <input className={inputCls} value={pub.title} placeholder="Title" onChange={e => updateList<Publication>('publications', i, { title: e.target.value })} />
+                <input className={inputCls} value={pub.year} placeholder="Year" onChange={e => updateList<Publication>('publications', i, { year: e.target.value })} />
+                <input className={inputCls} value={pub.link ?? ''} placeholder="Link (optional)" onChange={e => updateList<Publication>('publications', i, { link: e.target.value })} />
+              </div>
+            </div>
+          ))}
+          {addBtn('Add Publication', () => addToList<Publication>('publications', { title: '', year: '', link: '' }))}
+        </div>
+      </div>
+
+      {/* ── Research Interests ── */}
+      {(d.researchInterests !== undefined) && (
+        <div>
+          <SectionHead title="Research Interests" />
+          <textarea className={textareaCls} rows={2} value={d.researchInterests ?? ''} placeholder="Research interests..." onChange={e => set('researchInterests', e.target.value)} />
+        </div>
+      )}
+
+      {/* ── References ── */}
+      {(d.references?.length ?? 0) > 0 && (
+        <div>
+          <SectionHead title="References" />
+          <div className="space-y-3">
+            {d.references.map((ref, i) => (
+              <div key={i} className="relative bg-slate-700 rounded-lg p-4">
+                {removeBtn('references', i)}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  <input className={inputCls} value={ref.name} placeholder="Name" onChange={e => updateList<Reference>('references', i, { name: e.target.value })} />
+                  <input className={inputCls} value={ref.relationship ?? ''} placeholder="Relationship / Title" onChange={e => updateList<Reference>('references', i, { relationship: e.target.value })} />
+                  <input className={inputCls} value={ref.email} placeholder="Email" onChange={e => updateList<Reference>('references', i, { email: e.target.value })} />
+                  <input className={inputCls} value={ref.phone ?? ''} placeholder="Phone (optional)" onChange={e => updateList<Reference>('references', i, { phone: e.target.value })} />
+                </div>
+              </div>
+            ))}
+            {addBtn('Add Reference', () => addToList<Reference>('references', { name: '', email: '', relationship: '', phone: '' }))}
+          </div>
+        </div>
+      )}
+
+      {/* Bottom save */}
+      <div className="flex justify-end gap-2 pt-2 border-t border-slate-700">
+        <button onClick={onCancel} className="px-4 py-2 rounded-lg border border-slate-600 text-slate-300 hover:border-slate-500 hover:text-white text-sm transition">
+          Cancel
+        </button>
+        <button onClick={() => onSave(d)} className="px-5 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-semibold transition">
+          Save Changes
+        </button>
+      </div>
     </div>
   );
 }

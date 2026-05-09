@@ -32,6 +32,14 @@ export interface Publication {
   link?: string;
 }
 
+export interface Reference {
+  prefix?: string;
+  name: string;
+  relationship?: string;
+  phone?: string;
+  email: string;
+}
+
 export interface CVProfile {
   userId?: string;
   // Header
@@ -62,6 +70,9 @@ export interface CVProfile {
   awards: string;
   // Publications
   publications: Publication[];
+  // Research interests and references
+  researchInterests: string;
+  references: Reference[];
 }
 
 export interface TailoredCV {
@@ -82,6 +93,8 @@ export interface TailoredCV {
   memberships: string;
   awards: string;
   publications: Publication[];
+  researchInterests: string;
+  references: Reference[];
   coverLetter?: string;
 }
 

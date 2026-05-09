@@ -4,7 +4,7 @@ import { getProfile, saveProfile } from '../services/profileService';
 import { getSettings, savePersonalApiKey, type UserSettings } from '../services/settingsService';
 import { parseCVFile } from '../utils/cvParser';
 import type {
-  CVProfile, WorkExperience, Education, TechnicalProject, Certification, Publication,
+  CVProfile, WorkExperience, Education, TechnicalProject, Certification, Publication, Reference,
 } from '../types/cv';
 
 const emptyProfile = (): CVProfile => ({
@@ -13,6 +13,7 @@ const emptyProfile = (): CVProfile => ({
   summary: '', technicalSkills: '', softSkills: '',
   experience: [], projects: [], education: [],
   certifications: [], memberships: '', awards: '', publications: [],
+  researchInterests: '', references: [],
 });
 
 const emptyExp = (): WorkExperience => ({ jobTitle: '', company: '', startDate: '', endDate: null, description: '' });
@@ -20,6 +21,7 @@ const emptyEdu = (): Education => ({ degree: '', institution: '', graduationYear
 const emptyProject = (): TechnicalProject => ({ name: '', description: '', techStack: '', contribution: '' });
 const emptyCert = (): Certification => ({ name: '', issuer: '', year: '' });
 const emptyPub = (): Publication => ({ title: '', year: '', link: '' });
+const emptyReference = (): Reference => ({ prefix: '', name: '', relationship: '', phone: '', email: '' });
 
 // ── Reusable section wrapper ──────────────────────────────────────────────────
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
@@ -97,7 +99,13 @@ export default function ProfilePage() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
       const [saved, s] = await Promise.all([getProfile(user.id), getSettings(user.id)]);
-      if (saved) setProfile(saved);
+      if (saved) {
+        setProfile({
+          ...emptyProfile(),
+          ...saved,
+          references: Array.isArray(saved.references) ? saved.references : [],
+        });
+      }
       setSettings(s);
       setApiKey(s.personalApiKey ?? '');
       setLoading(false);
@@ -283,6 +291,75 @@ export default function ProfilePage() {
               placeholder="Team leadership, Agile, Communication, Problem-solving..."
               onChange={e => setProfile(p => ({ ...p, softSkills: e.target.value }))} />
           </Field>
+        </div>
+      </Section>
+
+      {/* ── Research & References ── */}
+      <Section title="Research Interests & References">
+        <div className="space-y-4">
+          <Field label="Research interests">
+            <BulletTextarea
+              rows={3}
+              value={profile.researchInterests}
+              placeholder="Artificial intelligence, data-driven decision making, human-centered design..."
+              onChange={v => setProfile(p => ({ ...p, researchInterests: v }))}
+            />
+          </Field>
+          <div className="space-y-3">
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <p className="text-sm font-medium text-slate-200">References / Recommendations</p>
+                <p className="text-xs text-slate-500">Add one or more reference contacts to include in your CV.</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => addItem<Reference>('references', emptyReference())}
+                className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-indigo-600 text-white text-xs font-semibold hover:bg-indigo-500 transition"
+              >
+                + Add Reference
+              </button>
+            </div>
+            <div className="space-y-4">
+              {(Array.isArray(profile.references) ? profile.references : []).map((ref, i) => (
+                <div key={i} className="border border-slate-700 rounded-xl p-4 space-y-3 relative">
+                  <button
+                    type="button"
+                    onClick={() => removeItem('references', i)}
+                    className="absolute right-3 top-3 text-slate-500 hover:text-red-400 transition"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <Field label="Prefix">
+                      <input className={inputCls} value={ref.prefix ?? ''} placeholder="Dr., Mr., Ms., Prof..."
+                        onChange={e => updateItem<Reference>('references', i, { prefix: e.target.value })} />
+                    </Field>
+                    <Field label="Full name">
+                      <input className={inputCls} value={ref.name} placeholder="Jane Doe"
+                        onChange={e => updateItem<Reference>('references', i, { name: e.target.value })} />
+                    </Field>
+                    <Field label="Relationship to applicant (optional)">
+                      <input className={inputCls} value={ref.relationship ?? ''} placeholder="Former manager, PhD advisor..."
+                        onChange={e => updateItem<Reference>('references', i, { relationship: e.target.value })} />
+                    </Field>
+                    <Field label="Phone number">
+                      <input className={inputCls} value={ref.phone ?? ''} placeholder="+1 555 123 4567"
+                        onChange={e => updateItem<Reference>('references', i, { phone: e.target.value })} />
+                    </Field>
+                    <Field label="Email address*">
+                      <input className={inputCls} value={ref.email} placeholder="jane.doe@example.com"
+                        onChange={e => updateItem<Reference>('references', i, { email: e.target.value })} />
+                    </Field>
+                  </div>
+                </div>
+              ))}
+              {profile.references.length === 0 && (
+                <p className="text-xs text-slate-500">No references added yet. Use the button above to add your first reference contact.</p>
+              )}
+            </div>
+          </div>
         </div>
       </Section>
 

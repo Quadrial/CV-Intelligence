@@ -78,7 +78,7 @@ STRICT RULES:
    - technicalSkills: Take the candidate's existing technical skills, reorder to put the most job-relevant first, then APPEND up to 6 missing keywords from the job description that are genuinely within the candidate's field of expertise and plausibly part of their background (e.g. if they are a metallurgical engineer, adding "HSE regulations" or "preventive maintenance" is valid). Do NOT add skills from a completely unrelated domain. Return as a single comma-separated string.
    - softSkills: Take the candidate's existing soft skills, reorder by relevance, then APPEND up to 3 missing soft skill keywords from the job description that are reasonable for this candidate's background. Return as a single comma-separated string.
    - certifications: Keep all, put most relevant first.
-   - memberships, awards, publications: Keep as-is.
+   - memberships, awards, publications, researchInterests, references: Keep as-is. Preserve the candidate's original wording and structure for research interests, and preserve the full reference contact details exactly as provided; do not fabricate new items in those fields.
 4. Every description field with multiple points must use bullet format: each point on its own line starting with "• ".
 5. Calculate the atsScore AFTER the skills augmentation — the score must reflect the improved CV, not the original.
 6. missingKeywords in atsScore must only list keywords that are STILL missing even after augmentation.
@@ -103,6 +103,8 @@ Return JSON matching this EXACT structure:
     "certifications": [{ "name": string, "issuer": string, "year": string }],
     "memberships": string,
     "awards": string,
+    "researchInterests": string,
+    "references": [{ "prefix": string | null, "name": string, "relationship": string | null, "phone": string | null, "email": string | null }],
     "publications": [{ "title": string, "year": string, "link": string | null }]
   },
   "atsScore": {

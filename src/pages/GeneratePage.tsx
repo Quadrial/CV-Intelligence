@@ -21,6 +21,16 @@ import type { TemplateId } from '../components/CVTemplate';
 type Step = 'input' | 'loading' | 'preview';
 type PreviewTab = 'cv' | 'cover' | 'ats';
 
+type CVSectionVisibility = {
+  projects: boolean;
+  certifications: boolean;
+  memberships: boolean;
+  awards: boolean;
+  publications: boolean;
+  researchInterests: boolean;
+  references: boolean;
+};
+
 export default function GeneratePage() {
   const [profile, setProfile] = useState<CVProfile | null>(null);
   const [profileLoading, setProfileLoading] = useState(true);
@@ -43,6 +53,15 @@ export default function GeneratePage() {
   const exportRef = useRef<HTMLDivElement>(null);
   const pendingGenerate = useRef(false);
   const [isEditing, setIsEditing] = useState(false);
+  const [cvSectionVisibility, setCvSectionVisibility] = useState<CVSectionVisibility>({
+    projects: true,
+    certifications: true,
+    memberships: true,
+    awards: true,
+    publications: true,
+    researchInterests: true,
+    references: true,
+  });
 
   useEffect(() => {
     (async () => {
@@ -156,8 +175,8 @@ export default function GeneratePage() {
     setShowExportMenu(false);
     try {
       const fileName = generateFileName(tailored.fullName, format);
-      if (format === 'pdf') await exportPDF(tailored, fileName);
-      else await exportDocx(tailored, fileName);
+      if (format === 'pdf') await exportPDF(tailored, fileName, cvSectionVisibility);
+      else await exportDocx(tailored, fileName, cvSectionVisibility);
     } catch (e: unknown) {
       setExportError(e instanceof Error ? e.message : 'Export failed. Please try again.');
     }
@@ -426,9 +445,33 @@ export default function GeneratePage() {
                     <p className="text-xs font-medium text-slate-400">Choose a template</p>
                     <TemplatePicker selected={template} onChange={setTemplate} />
                   </div>
+                  <div className="bg-slate-800 border border-slate-700 rounded-xl px-5 py-4 space-y-3">
+                    <p className="text-xs font-medium text-slate-400">Show/hide CV sections</p>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+                      {[
+                        { key: 'projects' as keyof CVSectionVisibility, label: 'Projects' },
+                        { key: 'certifications' as keyof CVSectionVisibility, label: 'Certifications' },
+                        { key: 'memberships' as keyof CVSectionVisibility, label: 'Memberships' },
+                        { key: 'awards' as keyof CVSectionVisibility, label: 'Awards' },
+                        { key: 'publications' as keyof CVSectionVisibility, label: 'Publications' },
+                        { key: 'researchInterests' as keyof CVSectionVisibility, label: 'Research Interests' },
+                        { key: 'references' as keyof CVSectionVisibility, label: 'References' },
+                      ].map(({ key, label }) => (
+                        <label key={key} className="flex items-center gap-2 cursor-pointer group">
+                          <input
+                            type="checkbox"
+                            checked={cvSectionVisibility[key]}
+                            onChange={(e) => setCvSectionVisibility(prev => ({ ...prev, [key]: e.target.checked }))}
+                            className="w-4 h-4 text-indigo-600 bg-slate-700 border-slate-600 rounded focus:ring-indigo-500 focus:ring-2"
+                          />
+                          <span className="text-sm text-slate-300 group-hover:text-white transition">{label}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
                   <div className="bg-slate-700 rounded-xl p-4 overflow-auto">
                     <div className="max-w-4xl mx-auto shadow-2xl rounded-lg overflow-hidden">
-                      <CVTemplate cv={tailored} template={template} />
+                      <CVTemplate cv={tailored} template={template} sectionVisibility={cvSectionVisibility} />
                     </div>
                   </div>
                 </>
