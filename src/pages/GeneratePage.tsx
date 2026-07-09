@@ -125,7 +125,11 @@ export default function GeneratePage() {
 
       if (useAppKey) {
         await incrementUsage(user.id);
-        setSettings(prev => prev ? { ...prev, freeUsageCount: prev.freeUsageCount + 1 } : prev);
+        setSettings(prev => prev ? {
+          ...prev,
+          dailyUsageCount: prev.dailyUsageCount + 1,
+          lastUsedDate: new Date().toISOString().slice(0, 10),
+        } : prev);
       }
 
       const saved = await saveHistory(user.id, jobDescription, result.tailoredCV, result.coverLetter).catch(() => null);
@@ -273,8 +277,8 @@ export default function GeneratePage() {
             : 'bg-amber-900/30 border-amber-700 text-amber-300'
           }`}>
             {hasOwnKey ? <><span className="w-1.5 h-1.5 rounded-full bg-emerald-400 inline-block" /> Using your API key — unlimited</>
-            : free > 0 ? <><span className="w-1.5 h-1.5 rounded-full bg-indigo-400 inline-block" /> {free} free generation{free !== 1 ? 's' : ''} remaining</>
-            : <><span className="w-1.5 h-1.5 rounded-full bg-amber-400 inline-block" /> Free limit reached — <button onClick={() => setShowApiModal(true)} className="underline hover:text-amber-200 ml-0.5">add your key</button></>}
+            : free > 0 ? <><span className="w-1.5 h-1.5 rounded-full bg-indigo-400 inline-block" /> {free} free generation{free !== 1 ? 's' : ''} left today</>
+            : <><span className="w-1.5 h-1.5 rounded-full bg-amber-400 inline-block" /> Daily limit reached — <button onClick={() => setShowApiModal(true)} className="underline hover:text-amber-200 ml-0.5">add your key</button></>}
           </div>
         )}
       </div>

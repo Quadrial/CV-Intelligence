@@ -199,3 +199,4 @@ Dark/light mode for the CV preview — some users prefer a white preview on a wh
 Onboarding tour — a short 3-step walkthrough for new users (fill profile → paste job → download).
 Usage analytics dashboard — show the user how many CVs they've generated, which roles, over time.
 LinkedIn import — let users paste their LinkedIn profile URL or upload a LinkedIn PDF export to auto-fill the profile form (LinkedIn exports are standard PDFs).
+i want us to add another important thing to this project, whre user can create portfoilio and share the link to people that needs it. the can create it here or from other ai and just import it here to have link from our website
