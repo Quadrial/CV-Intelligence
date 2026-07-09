@@ -616,7 +616,7 @@ export default function ProfilePage() {
             <p className={`text-xs font-medium ${settings.personalApiKey ? 'text-emerald-400' : 'text-amber-400'}`}>
               {settings.personalApiKey
                 ? '✓ Personal API key saved — unlimited generations active'
-                : `${Math.max(0, 2 - settings.freeUsageCount)} free generation(s) remaining`}
+                : `${Math.max(0, 2 - settings.dailyUsageCount)} free generation(s) left today`}
             </p>
           )}
           <div className="flex gap-2">
